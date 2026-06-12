@@ -26,15 +26,13 @@ export interface EntityInfo {
   thumbnail: string | null
 }
 
-// What the model returns for a word lookup (before Wikipedia enrichment).
+// What the model returns for a word lookup.
 export interface WordModelResult {
   lemma: string
   transliteration: string | null
   isProperNoun: boolean
   meanings: WordMeaning[]
   bestInContext: { translation: string; explanation: string }
-  // only when isProperNoun — the model's own knowledge, used to query Wikipedia
-  entityHint: { canonicalName: string; type: EntityInfo['type']; gloss: string } | null
 }
 
 export interface SentenceModelResult {
@@ -42,7 +40,9 @@ export interface SentenceModelResult {
   notes: string | null
 }
 
-export interface WordResponse extends Omit<WordModelResult, 'entityHint'> {
+// entity stays in the contract: older cached responses still carry one, and the
+// client renders it only when present. New lookups always return null.
+export interface WordResponse extends WordModelResult {
   mode: 'word'
   word: string
   entity: EntityInfo | null
@@ -75,7 +75,7 @@ export interface AIProvider {
 export const WORD_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['lemma', 'transliteration', 'isProperNoun', 'meanings', 'bestInContext', 'entityHint'],
+  required: ['lemma', 'transliteration', 'isProperNoun', 'meanings', 'bestInContext'],
   properties: {
     lemma: { type: 'string', description: 'Dictionary/base form of the word in the source language' },
     transliteration: {
@@ -107,22 +107,6 @@ export const WORD_SCHEMA = {
         explanation: { type: 'string', description: 'One short sentence: why this meaning fits here (grammar form, idiom, etc.)' },
       },
     },
-    entityHint: {
-      anyOf: [
-        { type: 'null' },
-        {
-          type: 'object',
-          additionalProperties: false,
-          required: ['canonicalName', 'type', 'gloss'],
-          properties: {
-            canonicalName: { type: 'string', description: 'Canonical English name of the entity, suitable as a Wikipedia title' },
-            type: { type: 'string', enum: ['person', 'place', 'work', 'organization', 'other'] },
-            gloss: { type: 'string', description: 'One-sentence explanation of what/who this is, in the target language' },
-          },
-        },
-      ],
-      description: 'Only when isProperNoun is true, else null',
-    },
   },
 } as const
 
@@ -152,8 +136,7 @@ Return:
 - transliteration: Latin transliteration if the source script is non-Latin, else null.
 - isProperNoun: whether this is a name of a person, place, work, organization, etc.
 - meanings: ALL distinct meanings of the word (as used generally, not just here), translated to ${req.tgtLang}, most common first, with part of speech. Empty array if it is a proper noun.
-- bestInContext: the single best translation of the word in this exact passage, with a one-sentence explanation in ${req.tgtLang}.
-- entityHint: only for proper nouns — canonical English name (usable as a Wikipedia article title), entity type, and a one-sentence gloss in ${req.tgtLang}. Null otherwise.`
+- bestInContext: the single best translation of the word in this exact passage, with a one-sentence explanation in ${req.tgtLang}.`
 }
 
 export function sentencePrompt(req: ProviderRequest): string {

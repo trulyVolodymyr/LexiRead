@@ -1,7 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { SentenceResponse, TranslateRequest, WordResponse } from '../_shared/contract.ts'
 import { getProvider } from '../_shared/providers/index.ts'
-import { lookupEntity } from '../_shared/wikipedia.ts'
 
 const WORD_DAILY_LIMIT = Number(Deno.env.get('WORD_DAILY_LIMIT') ?? 500)
 const SENTENCE_DAILY_LIMIT = Number(Deno.env.get('SENTENCE_DAILY_LIMIT') ?? 100)
@@ -46,7 +45,7 @@ async function cacheGet(key: string): Promise<unknown | null> {
 
 async function cachePut(
   key: string,
-  mode: 'word' | 'sentence' | 'entity',
+  mode: 'word' | 'sentence',
   req: { srcLang: string; tgtLang: string },
   provider: string,
   response: unknown,
@@ -123,24 +122,11 @@ Deno.serve(async (req) => {
 
     const model = await provider.wordLookup(body)
 
-    let entity = null
-    if (model.isProperNoun && model.entityHint) {
-      const entityKey = await sha256(`entity:${body.tgtLang}:${model.entityHint.canonicalName.normalize('NFC').toLowerCase()}`)
-      const cachedEntity = await cacheGet(entityKey)
-      if (cachedEntity) {
-        entity = cachedEntity
-      } else {
-        entity = await lookupEntity(model.entityHint, body.srcLang, body.tgtLang)
-        await cachePut(entityKey, 'entity', body, provider.name, entity)
-      }
-    }
-
-    const { entityHint: _drop, ...modelRest } = model
     const response: WordResponse = {
-      ...modelRest,
+      ...model,
       mode: 'word',
       word: body.word!,
-      entity: entity as WordResponse['entity'],
+      entity: null,
       cached: false,
       provider: provider.name,
     }
