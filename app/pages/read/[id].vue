@@ -28,7 +28,7 @@ const currentSentence = ref('')
 
 // Both reader components expose the same handle; which one renders follows the setting.
 interface ReaderHandle {
-  jumpTo: (chunkIndex: number, charOffset: number) => void | Promise<void>
+  jumpTo: (chunkIndex: number, charOffset: number, anchorY?: number) => void | Promise<void>
   container: HTMLElement | undefined
 }
 const viewport = ref<ReaderHandle>()
@@ -122,7 +122,7 @@ watch(
   () => [settings.value.fontSize, settings.value.fontFamily, settings.value.lineHeight, settings.value.marginsPct],
   async () => {
     await nextTick()
-    viewport.value?.jumpTo(lastPosition.value.chunkIndex, lastPosition.value.charOffset)
+    viewport.value?.jumpTo(lastPosition.value.chunkIndex, lastPosition.value.charOffset, lastPosition.value.anchorY)
   },
 )
 

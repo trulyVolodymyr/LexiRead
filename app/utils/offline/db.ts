@@ -28,6 +28,8 @@ export interface LocalProgress {
   chunkIndex: number
   charOffset: number
   percent: number
+  /** viewport y-offset of the anchor char — non-indexed, no schema bump needed */
+  anchorY?: number
   updatedAt: number
   dirty: number // 0|1 — Dexie can't index booleans
 }

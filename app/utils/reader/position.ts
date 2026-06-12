@@ -60,7 +60,7 @@ export function rangeAtCharOffset(root: Element, charOffset: number): Range | nu
  * the math exact and synchronous; the loop re-verifies once since the first
  * correction can itself reflow neighbors.
  */
-export function scrollToCharOffset(container: HTMLElement, root: HTMLElement, charOffset: number) {
+export function scrollToCharOffset(container: HTMLElement, root: HTMLElement, charOffset: number, anchorY = 8) {
   const previous = root.style.contentVisibility
   root.style.contentVisibility = 'visible'
   try {
@@ -70,7 +70,7 @@ export function scrollToCharOffset(container: HTMLElement, root: HTMLElement, ch
         root.scrollIntoView()
         return
       }
-      const delta = target.top - container.getBoundingClientRect().top - 8
+      const delta = target.top - container.getBoundingClientRect().top - anchorY
       if (Math.abs(delta) <= 1) return
       container.scrollTop += delta
     }

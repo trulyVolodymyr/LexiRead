@@ -4,6 +4,8 @@ export interface Position {
   chunkIndex: number
   charOffset: number
   percent: number
+  /** Viewport y-offset of the anchor char at save time — restores pixel-exact. Local only. */
+  anchorY?: number
 }
 
 /**
@@ -74,14 +76,14 @@ export function useReadingProgress() {
     const candidates: { position: Position; time: number; fromRemote: boolean }[] = []
     if (local) {
       candidates.push({
-        position: { chunkIndex: local.chunkIndex, charOffset: local.charOffset, percent: local.percent },
+        position: { chunkIndex: local.chunkIndex, charOffset: local.charOffset, percent: local.percent, anchorY: local.anchorY },
         time: local.updatedAt,
         fromRemote: false,
       })
     }
     if (mirror) {
       candidates.push({
-        position: { chunkIndex: mirror.chunkIndex, charOffset: mirror.charOffset, percent: mirror.percent },
+        position: { chunkIndex: mirror.chunkIndex, charOffset: mirror.charOffset, percent: mirror.percent, anchorY: mirror.anchorY },
         time: mirror.updatedAt,
         fromRemote: false,
       })
