@@ -86,6 +86,22 @@ function setupSentinels() {
   onBeforeUnmount(() => observer.disconnect())
 }
 
+/**
+ * Apply a window mutation while keeping a retained chunk visually fixed:
+ * measure its viewport offset before and after, then correct scrollTop by the
+ * real difference. Height-based compensation is off by the paragraph margins
+ * that collapse through the chunk wrappers, which reads as a visible jump.
+ */
+async function withStableAnchor(anchorIndex: number, mutate: () => void) {
+  const before = chunkRoot(anchorIndex)?.getBoundingClientRect().top
+  mutate()
+  await nextTick()
+  const after = chunkRoot(anchorIndex)?.getBoundingClientRect().top
+  if (container.value && before !== undefined && after !== undefined) {
+    container.value.scrollTop += after - before
+  }
+}
+
 async function appendNext() {
   if (shifting || !chunks.value.length) return
   const nextIndex = chunks.value[chunks.value.length - 1]!.index + 1
@@ -94,12 +110,11 @@ async function appendNext() {
   try {
     const next = await getChunk(nextIndex)
     if (!next) return
-    let dropHeight = 0
     const dropFirst = chunks.value.length + 1 > WINDOW_SIZE
-    if (dropFirst) dropHeight = chunkRoot(chunks.value[0]!.index)?.offsetHeight ?? 0
-    chunks.value = [...(dropFirst ? chunks.value.slice(1) : chunks.value), next]
-    await nextTick()
-    if (dropFirst && container.value) container.value.scrollTop -= dropHeight
+    const anchorIndex = (dropFirst ? chunks.value[1] : chunks.value[0])!.index
+    await withStableAnchor(anchorIndex, () => {
+      chunks.value = [...(dropFirst ? chunks.value.slice(1) : chunks.value), next]
+    })
   } finally {
     shifting = false
   }
@@ -114,10 +129,9 @@ async function prependPrev() {
     const prev = await getChunk(prevIndex)
     if (!prev) return
     const dropLast = chunks.value.length + 1 > WINDOW_SIZE
-    chunks.value = [prev, ...(dropLast ? chunks.value.slice(0, -1) : chunks.value)]
-    await nextTick()
-    const added = chunkRoot(prevIndex)?.offsetHeight ?? 0
-    if (container.value) container.value.scrollTop += added
+    await withStableAnchor(chunks.value[0]!.index, () => {
+      chunks.value = [prev, ...(dropLast ? chunks.value.slice(0, -1) : chunks.value)]
+    })
   } finally {
     shifting = false
   }

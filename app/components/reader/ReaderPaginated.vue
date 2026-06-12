@@ -150,10 +150,17 @@ async function prependPrev() {
   try {
     const prev = await getChunk(prevIndex)
     if (!prev) return
+    // Keep the current first chunk visually fixed: measure its viewport offset
+    // before and after, then correct scrollTop by the real difference (height
+    // math misses margins collapsing through the chunk wrappers).
+    const anchorIndex = chunks.value[0]!.index
+    const before = chunkRoot(anchorIndex)?.getBoundingClientRect().top
     chunks.value = [prev, ...chunks.value]
     await nextTick()
-    const added = chunkRoot(prevIndex)?.offsetHeight ?? 0
-    if (container.value) container.value.scrollTop += added
+    const after = chunkRoot(anchorIndex)?.getBoundingClientRect().top
+    if (container.value && before !== undefined && after !== undefined) {
+      container.value.scrollTop += after - before
+    }
   } finally {
     shifting = false
   }
