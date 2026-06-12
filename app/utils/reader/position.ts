@@ -50,6 +50,35 @@ export function rangeAtCharOffset(root: Element, charOffset: number): Range | nu
   return null
 }
 
+/**
+ * Scroll container so the char offset within root sits at the top.
+ *
+ * content-visibility:auto sizes unrendered chunks at a placeholder height
+ * until a rendering frame runs, so a scroll computed right after mount clamps
+ * against a bogus scrollHeight and silently lands at the chunk top. Forcing
+ * real layout on the target chunk for the duration of the measurement makes
+ * the math exact and synchronous; the loop re-verifies once since the first
+ * correction can itself reflow neighbors.
+ */
+export function scrollToCharOffset(container: HTMLElement, root: HTMLElement, charOffset: number) {
+  const previous = root.style.contentVisibility
+  root.style.contentVisibility = 'visible'
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const target = rangeAtCharOffset(root, charOffset)?.getBoundingClientRect()
+      if (!target || (target.top === 0 && target.height === 0)) {
+        root.scrollIntoView()
+        return
+      }
+      const delta = target.top - container.getBoundingClientRect().top - 8
+      if (Math.abs(delta) <= 1) return
+      container.scrollTop += delta
+    }
+  } finally {
+    root.style.contentVisibility = previous
+  }
+}
+
 /** First visible text position at the top of the scroll container. */
 export function topVisiblePosition(container: HTMLElement): { node: Node; offset: number } | null {
   const rect = container.getBoundingClientRect()

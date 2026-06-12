@@ -2,7 +2,7 @@
 import type { LoadedChunk } from '~/composables/useChunks'
 import type { Position } from '~/composables/useReadingProgress'
 import type { TocEntry } from '~/types'
-import { charOffsetOf, rangeAtCharOffset, topVisiblePosition } from '~/utils/reader/position'
+import { charOffsetOf, scrollToCharOffset, topVisiblePosition } from '~/utils/reader/position'
 
 const props = defineProps<{
   bookId: string
@@ -94,15 +94,8 @@ function chunkRoot(index: number): HTMLElement | null {
 
 function restoreTo(chunkIndex: number, charOffset: number) {
   const root = chunkRoot(chunkIndex)
-  const el = container.value
-  if (!root || !el) return
-  const range = rangeAtCharOffset(root, charOffset)
-  const target = range?.getBoundingClientRect()
-  if (target && (target.top !== 0 || target.height !== 0)) {
-    el.scrollTop += target.top - el.getBoundingClientRect().top - 8
-  } else {
-    root.scrollIntoView()
-  }
+  if (!root || !container.value) return
+  scrollToCharOffset(container.value, root, charOffset)
 }
 
 // ---- lazy loading within the chapter ---------------------------------------
