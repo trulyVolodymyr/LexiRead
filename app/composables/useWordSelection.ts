@@ -2,8 +2,10 @@ import { caretFromPoint, charOffsetOf } from '~/utils/reader/position'
 
 export interface WordSelection {
   word: string
-  /** previous sentence + sentence containing the word, capped at 600 chars */
+  /** just the sentence containing the word — what "translate the sentence" should send */
   sentence: string
+  /** previous sentence + containing sentence, capped at 600 chars — context for the word lookup */
+  context: string
   rect: DOMRect
 }
 
@@ -51,15 +53,16 @@ export function useWordSelection() {
       }
       previous = seg.segment
     }
+    const own = sentence.trim().slice(0, MAX_CONTEXT)
     let context = `${previous}${sentence}`.trim()
-    if (context.length > MAX_CONTEXT) context = sentence.trim().slice(0, MAX_CONTEXT)
+    if (context.length > MAX_CONTEXT) context = own
 
     const range = rangeForTextSpan(block, wordStart, wordStart + word.length)
     if (range) {
       highlight(range)
-      return { word, sentence: context, rect: range.getBoundingClientRect() }
+      return { word, sentence: own, context, rect: range.getBoundingClientRect() }
     }
-    return { word, sentence: context, rect: new DOMRect(x, y, 1, 1) }
+    return { word, sentence: own, context, rect: new DOMRect(x, y, 1, 1) }
   }
 
   function highlight(range: Range) {

@@ -86,3 +86,14 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 100px;
 }
+
+/* Translation drawer: full-bleed body (layout owns its padding), fits phones.
+   Both selectors because Element Plus may put the class on the overlay or panel. */
+.translation-drawer .el-drawer__body,
+.el-drawer.translation-drawer .el-drawer__body {
+  padding: 0;
+}
+.translation-drawer .el-drawer,
+.el-drawer.translation-drawer {
+  max-width: 92vw;
+}

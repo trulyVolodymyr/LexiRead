@@ -22,9 +22,10 @@ const notFound = ref(false)
 
 const tocVisible = ref(false)
 const settingsVisible = ref(false)
-const popoverVisible = ref(false)
-const selectionRect = ref<DOMRect | null>(null)
+const translationVisible = ref(false)
+const currentWord = ref('')
 const currentSentence = ref('')
+const currentContext = ref('')
 
 // Both reader components expose the same handle; which one renders follows the setting.
 interface ReaderHandle {
@@ -91,13 +92,14 @@ function onTap(event: PointerEvent) {
 
   const selection = selectWordAt(event.clientX, event.clientY, container, book.value.language)
   if (!selection) {
-    closePopover()
+    translationVisible.value = false
     return
   }
-  selectionRect.value = selection.rect
+  currentWord.value = selection.word
   currentSentence.value = selection.sentence
-  popoverVisible.value = true
-  translation.translateWord(selection.word, selection.sentence, book.value.language, settings.value.targetLang)
+  currentContext.value = selection.context
+  translationVisible.value = true
+  translation.translateWord(selection.word, selection.context, book.value.language, settings.value.targetLang)
 }
 
 function onTranslateSentence() {
@@ -105,15 +107,26 @@ function onTranslateSentence() {
   translation.translateSentence(currentSentence.value, book.value.language, settings.value.targetLang)
 }
 
-function closePopover() {
-  popoverVisible.value = false
-  selectionRect.value = null
-  translation.reset()
-  clearHighlight()
-}
+// drawer closed (X, Esc, empty tap) → drop the highlight and stale results
+watch(translationVisible, (open) => {
+  if (!open) {
+    translation.reset()
+    clearHighlight()
+  }
+})
+
+// target language changed while the drawer is open → re-translate the same word
+watch(
+  () => settings.value.targetLang,
+  (targetLang) => {
+    if (translationVisible.value && currentWord.value && book.value) {
+      translation.translateWord(currentWord.value, currentContext.value, book.value.language, targetLang)
+    }
+  },
+)
 
 function onTocNavigate(entry: TocEntry) {
-  closePopover()
+  translationVisible.value = false
   viewport.value?.jumpTo(entry.chunkIndex, entry.charOffset)
 }
 
@@ -194,9 +207,10 @@ const percentLabel = computed(() => `${Math.round(lastPosition.value.percent * 1
 
     <TocDrawer v-if="book" v-model="tocVisible" :toc="book.toc" :current-chunk="lastPosition.chunkIndex" @navigate="onTocNavigate" />
     <ReaderSettingsDrawer v-model="settingsVisible" />
-    <TranslationPopover
-      v-model="popoverVisible"
-      :rect="selectionRect"
+    <TranslationDrawer
+      v-if="book"
+      v-model="translationVisible"
+      :src-lang="book.language"
       :loading="translation.loading.value"
       :sentence-loading="translation.sentenceLoading.value"
       :word="translation.wordResult.value"
