@@ -15,11 +15,32 @@ export function useReadingProgress() {
   const supabase = useSupabaseClient()
   const user = useSupabaseUser()
 
+  const mirrorKey = (bookId: string) => `lexiread:pos:${bookId}`
+
   async function save(bookId: string, position: Position) {
     const updatedAt = Date.now()
+    // Synchronous mirror first: async IndexedDB/network writes aren't
+    // guaranteed to finish when the page is being unloaded.
+    try {
+      localStorage.setItem(mirrorKey(bookId), JSON.stringify({ ...position, updatedAt }))
+    } catch {
+      /* quota/private mode — Dexie still has it */
+    }
     await db.progress.put({ bookId, ...position, updatedAt, dirty: 1 })
     if (navigator.onLine && user.value) {
       await pushOne(bookId, position, updatedAt)
+    }
+  }
+
+  function readMirror(bookId: string): (Position & { updatedAt: number }) | null {
+    try {
+      const raw = localStorage.getItem(mirrorKey(bookId))
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (typeof parsed?.chunkIndex !== 'number' || typeof parsed?.updatedAt !== 'number') return null
+      return parsed
+    } catch {
+      return null
     }
   }
 
@@ -36,9 +57,10 @@ export function useReadingProgress() {
     if (!error) await db.progress.update(bookId, { dirty: 0 })
   }
 
-  /** Local vs server, newest updated_at wins. Falls back gracefully offline. */
+  /** Mirror vs Dexie vs server, newest updated_at wins. Falls back gracefully offline. */
   async function load(bookId: string): Promise<Position | null> {
     const local = await db.progress.get(bookId)
+    const mirror = readMirror(bookId)
     let remote: { chunk_index: number; char_offset: number; percent: number; updated_at: string } | null = null
     if (navigator.onLine && user.value) {
       const { data } = await supabase
@@ -49,19 +71,35 @@ export function useReadingProgress() {
       remote = data
     }
 
-    const remoteTime = remote ? new Date(remote.updated_at).getTime() : -1
-    const localTime = local?.updatedAt ?? -1
-    if (remoteTime < 0 && localTime < 0) return null
-    if (remoteTime > localTime) {
-      const position = {
-        chunkIndex: remote!.chunk_index,
-        charOffset: remote!.char_offset,
-        percent: remote!.percent,
-      }
-      await db.progress.put({ bookId, ...position, updatedAt: remoteTime, dirty: 0 })
-      return position
+    const candidates: { position: Position; time: number; fromRemote: boolean }[] = []
+    if (local) {
+      candidates.push({
+        position: { chunkIndex: local.chunkIndex, charOffset: local.charOffset, percent: local.percent },
+        time: local.updatedAt,
+        fromRemote: false,
+      })
     }
-    return { chunkIndex: local!.chunkIndex, charOffset: local!.charOffset, percent: local!.percent }
+    if (mirror) {
+      candidates.push({
+        position: { chunkIndex: mirror.chunkIndex, charOffset: mirror.charOffset, percent: mirror.percent },
+        time: mirror.updatedAt,
+        fromRemote: false,
+      })
+    }
+    if (remote) {
+      candidates.push({
+        position: { chunkIndex: remote.chunk_index, charOffset: remote.char_offset, percent: remote.percent },
+        time: new Date(remote.updated_at).getTime(),
+        fromRemote: true,
+      })
+    }
+    if (!candidates.length) return null
+
+    const best = candidates.sort((a, b) => b.time - a.time)[0]!
+    if (best.fromRemote) {
+      await db.progress.put({ bookId, ...best.position, updatedAt: best.time, dirty: 0 })
+    }
+    return best.position
   }
 
   /** Push all dirty rows — call on app start and on the `online` event. */

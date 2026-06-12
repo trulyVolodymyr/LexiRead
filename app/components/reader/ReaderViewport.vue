@@ -139,19 +139,32 @@ async function prependPrev() {
 
 // ---- position reporting ---------------------------------------------------
 
-const emitPosition = useDebounceFn(() => {
-  if (shifting || !container.value) return
+function currentPosition(): Position | null {
+  if (shifting || !container.value) return null
   const caret = topVisiblePosition(container.value)
-  if (!caret) return
+  if (!caret) return null
   const rootEl = (caret.node.parentElement ?? null)?.closest('[data-chunk-index]') as HTMLElement | null
-  if (!rootEl) return
+  if (!rootEl) return null
   const index = Number(rootEl.dataset.chunkIndex)
   const chunk = chunks.value.find((c) => c.index === index)
-  if (!chunk) return
+  if (!chunk) return null
   const charOffset = charOffsetOf(rootEl, caret.node, caret.offset)
   const percent = props.charCount > 0 ? Math.min(1, (chunk.charStart + charOffset) / props.charCount) : 0
-  emit('position', { chunkIndex: index, charOffset, percent })
+  return { chunkIndex: index, charOffset, percent }
+}
+
+const emitPosition = useDebounceFn(() => {
+  const position = currentPosition()
+  if (position) emit('position', position)
 }, 1000)
+
+// The debounce loses the final second of reading on reload/close — flush the
+// exact position the moment the page is hidden.
+useEventListener(document, 'visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return
+  const position = currentPosition()
+  if (position) emit('position', position)
+})
 
 function onScroll() {
   emitPosition()
