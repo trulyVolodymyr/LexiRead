@@ -95,6 +95,26 @@ async function withStableAnchor(anchorIndex: number, mutate: () => void) {
   }
 }
 
+/**
+ * Right after a restore, chunks below the viewport are still placeholder-sized,
+ * which parks the sentinels close enough to fire immediately — never let that
+ * evict a chunk the user is actually looking at. The window may temporarily
+ * exceed WINDOW_SIZE; it shrinks back on later shifts.
+ */
+function fullyAbove(index: number): boolean {
+  const root = chunkRoot(index)
+  const el = container.value
+  if (!root || !el) return true
+  return root.getBoundingClientRect().bottom < el.getBoundingClientRect().top - 100
+}
+
+function fullyBelow(index: number): boolean {
+  const root = chunkRoot(index)
+  const el = container.value
+  if (!root || !el) return true
+  return root.getBoundingClientRect().top > el.getBoundingClientRect().bottom + 100
+}
+
 async function appendNext() {
   if (shifting || !chunks.value.length) return
   const nextIndex = chunks.value[chunks.value.length - 1]!.index + 1
@@ -103,7 +123,7 @@ async function appendNext() {
   try {
     const next = await getChunk(nextIndex)
     if (!next) return
-    const dropFirst = chunks.value.length + 1 > WINDOW_SIZE
+    const dropFirst = chunks.value.length + 1 > WINDOW_SIZE && fullyAbove(chunks.value[0]!.index)
     const anchorIndex = (dropFirst ? chunks.value[1] : chunks.value[0])!.index
     await withStableAnchor(anchorIndex, () => {
       chunks.value = [...(dropFirst ? chunks.value.slice(1) : chunks.value), next]
@@ -121,7 +141,7 @@ async function prependPrev() {
   try {
     const prev = await getChunk(prevIndex)
     if (!prev) return
-    const dropLast = chunks.value.length + 1 > WINDOW_SIZE
+    const dropLast = chunks.value.length + 1 > WINDOW_SIZE && fullyBelow(chunks.value[chunks.value.length - 1]!.index)
     await withStableAnchor(chunks.value[0]!.index, () => {
       chunks.value = [prev, ...(dropLast ? chunks.value.slice(0, -1) : chunks.value)]
     })

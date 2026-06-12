@@ -75,7 +75,15 @@ export function scrollToCharOffset(container: HTMLElement, root: HTMLElement, ch
       container.scrollTop += delta
     }
   } finally {
-    root.style.contentVisibility = previous
+    // Reverting to auto right away re-collapses the chunk to its placeholder
+    // size on the next layout, and the browser clamps scrollTop back to ~0 —
+    // silently undoing the restore. Revert only after a rendering frame: by
+    // then the chunk intersects the viewport, so auto keeps it expanded.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        root.style.contentVisibility = previous
+      }),
+    )
   }
 }
 
