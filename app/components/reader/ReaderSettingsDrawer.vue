@@ -18,13 +18,6 @@ const FONTS = [
 <template>
   <el-drawer v-model="visible" title="Reading settings" direction="rtl" size="320px">
     <el-form label-position="top">
-      <el-form-item label="Reading mode">
-        <el-radio-group v-model="settings.pageMode">
-          <el-radio-button value="scroll">Scroll</el-radio-button>
-          <el-radio-button value="paginated">Chapters</el-radio-button>
-        </el-radio-group>
-      </el-form-item>
-
       <el-form-item label="Theme">
         <el-radio-group v-model="settings.theme">
           <el-radio-button value="light">Light</el-radio-button>

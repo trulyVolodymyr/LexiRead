@@ -1,7 +1,6 @@
 export type BookFormat = 'epub' | 'fb2' | 'txt'
 export type BookStatus = 'uploading' | 'ready' | 'failed'
 export type ReaderTheme = 'light' | 'sepia' | 'dark'
-export type PageMode = 'scroll' | 'paginated'
 
 export interface TocEntry {
   title: string
@@ -51,7 +50,6 @@ export interface ReaderSettings {
   theme: ReaderTheme
   marginsPct: number
   targetLang: string
-  pageMode: PageMode
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
@@ -61,7 +59,6 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   theme: 'light',
   marginsPct: 8,
   targetLang: 'en',
-  pageMode: 'scroll',
 }
 
 // ---- translation contract (mirrors supabase/functions/_shared/contract.ts)

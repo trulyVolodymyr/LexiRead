@@ -101,11 +101,15 @@ function restoreTo(chunkIndex: number, charOffset: number, anchorY?: number) {
 }
 
 // ---- lazy loading within the chapter ---------------------------------------
-// Same sentinel pattern as scroll mode, but bounded to the current chapter and
-// without dropping: a chapter's chunks accumulate so the footer stays reachable.
+// IntersectionObserver sentinels load chunks lazily, bounded to the current
+// chapter and without dropping: chunks accumulate so the footer stays reachable.
 
 const topSentinel = ref<HTMLElement>()
 const bottomSentinel = ref<HTMLElement>()
+
+// registered at setup time — setupSentinels runs async, where hooks can't attach
+let sentinelObserver: IntersectionObserver | null = null
+onBeforeUnmount(() => sentinelObserver?.disconnect())
 
 function setupSentinels() {
   if (!container.value) return
@@ -121,7 +125,8 @@ function setupSentinels() {
   )
   if (topSentinel.value) observer.observe(topSentinel.value)
   if (bottomSentinel.value) observer.observe(bottomSentinel.value)
-  onBeforeUnmount(() => observer.disconnect())
+  sentinelObserver?.disconnect()
+  sentinelObserver = observer
 }
 
 async function appendNext() {

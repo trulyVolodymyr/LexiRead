@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Book, TocEntry } from '~/types'
 import type { Position } from '~/composables/useReadingProgress'
-import ReaderViewport from '~/components/reader/ReaderViewport.vue'
 import ReaderPaginated from '~/components/reader/ReaderPaginated.vue'
 import { db } from '~/utils/offline/db'
 
@@ -27,21 +26,12 @@ const currentWord = ref('')
 const currentSentence = ref('')
 const currentContext = ref('')
 
-// Both reader components expose the same handle; which one renders follows the setting.
 interface ReaderHandle {
   jumpTo: (chunkIndex: number, charOffset: number, anchorY?: number) => void | Promise<void>
   container: HTMLElement | undefined
 }
 const viewport = ref<ReaderHandle>()
 const lastPosition = ref<Position>({ chunkIndex: 0, charOffset: 0, percent: 0 })
-
-// Mode switch swaps the reader component — hand the current position over so it resumes in place.
-watch(
-  () => settings.value.pageMode,
-  () => {
-    initialPosition.value = { ...lastPosition.value }
-  },
-)
 
 onMounted(async () => {
   // online → server row; offline → Dexie copy of a downloaded book
@@ -177,29 +167,17 @@ const percentLabel = computed(() => `${Math.round(lastPosition.value.percent * 1
         <p :style="{ color: 'var(--reader-fg)' }">This book isn't available — it may not be downloaded for offline reading.</p>
         <NuxtLink to="/"><el-button>Back to library</el-button></NuxtLink>
       </div>
-      <template v-else-if="ready && book">
-        <ReaderViewport
-          v-if="settings.pageMode === 'scroll'"
-          ref="viewport"
-          :book-id="bookId"
-          :chunk-count="book.chunk_count"
-          :char-count="book.char_count"
-          :initial="initialPosition"
-          @position="onPosition"
-          @tap="onTap"
-        />
-        <ReaderPaginated
-          v-else
-          ref="viewport"
-          :book-id="bookId"
-          :chunk-count="book.chunk_count"
-          :char-count="book.char_count"
-          :toc="book.toc"
-          :initial="initialPosition"
-          @position="onPosition"
-          @tap="onTap"
-        />
-      </template>
+      <ReaderPaginated
+        v-else-if="ready && book"
+        ref="viewport"
+        :book-id="bookId"
+        :chunk-count="book.chunk_count"
+        :char-count="book.char_count"
+        :toc="book.toc"
+        :initial="initialPosition"
+        @position="onPosition"
+        @tap="onTap"
+      />
       <div v-else class="flex h-full items-center justify-center opacity-60" :style="{ color: 'var(--reader-fg)' }">
         Loading…
       </div>
