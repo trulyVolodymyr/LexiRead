@@ -9,9 +9,11 @@ watchEffect(() => {
 
 async function signInWithGoogle() {
   loading.value = true
+  // Include app.baseURL — on GitHub Pages the app lives under a subpath.
+  const callbackUrl = new URL('auth/callback', window.location.origin + useRuntimeConfig().app.baseURL)
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${window.location.origin}/auth/callback` },
+    options: { redirectTo: callbackUrl.href },
   })
   if (error) {
     loading.value = false

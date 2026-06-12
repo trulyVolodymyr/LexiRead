@@ -1,8 +1,13 @@
 import tailwindcss from '@tailwindcss/vite'
 
+// '/' locally; CI sets '/LexiRead/' because GitHub Pages serves from a subpath.
+const base = process.env.NUXT_APP_BASE_URL || '/'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+
+  app: { baseURL: base },
 
   // Reader sits behind login (no SEO value) and offline mode needs a static PWA shell.
   ssr: false,
@@ -48,15 +53,16 @@ export default defineNuxtConfig({
       theme_color: '#1f2937',
       background_color: '#111827',
       display: 'standalone',
-      start_url: '/',
+      start_url: base,
+      scope: base,
       icons: [
-        { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-        { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-        { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: `${base}icon-192.png`, sizes: '192x192', type: 'image/png' },
+        { src: `${base}icon-512.png`, sizes: '512x512', type: 'image/png' },
+        { src: `${base}icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ],
     },
     workbox: {
-      navigateFallback: '/',
+      navigateFallback: base,
       globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}'],
       // Book content lives in IndexedDB, not SW caches. Never cache RLS-scoped API data.
       runtimeCaching: [
