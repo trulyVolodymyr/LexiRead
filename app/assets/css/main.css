@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* Single dark-mode switch: .dark on <html> drives both Tailwind and Element Plus. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Reader theme palettes — applied via data-reader-theme on the reader root. */
+:root {
+  --reader-bg: #faf8f5;
+  --reader-fg: #1a1a1a;
+  --reader-accent: #2563eb;
+
+  --reader-font: 'Georgia', serif;
+  --reader-size: 18px;
+  --reader-leading: 1.7;
+  --reader-margin: 8%;
+}
+
+[data-reader-theme='light'] {
+  --reader-bg: #ffffff;
+  --reader-fg: #1a1a1a;
+}
+
+[data-reader-theme='sepia'] {
+  --reader-bg: #f4ecd8;
+  --reader-fg: #4a3f2f;
+}
+
+[data-reader-theme='dark'] {
+  --reader-bg: #121212;
+  --reader-fg: #c9c9c9;
+}
+
+/* Word highlight via CSS Custom Highlight API — no DOM mutation. */
+::highlight(selected-word) {
+  background-color: rgb(37 99 235 / 0.3);
+  border-radius: 2px;
+}
+
+.reader-content {
+  font-family: var(--reader-font);
+  font-size: var(--reader-size);
+  line-height: var(--reader-leading);
+  padding-left: var(--reader-margin);
+  padding-right: var(--reader-margin);
+  color: var(--reader-fg);
+  /* Manual scroll compensation when the chunk window shifts. */
+  overflow-anchor: none;
+}
+
+.reader-content p {
+  margin: 0.8em 0;
+  text-indent: 1.2em;
+}
+
+.reader-content h1,
+.reader-content h2,
+.reader-content h3,
+.reader-content h4 {
+  font-weight: 700;
+  margin: 1.2em 0 0.6em;
+  text-align: center;
+}
+
+.reader-content h1 { font-size: 1.5em; }
+.reader-content h2 { font-size: 1.3em; }
+.reader-content h3 { font-size: 1.15em; }
+
+.reader-content blockquote {
+  margin: 1em 2em;
+  font-style: italic;
+}
+
+.reader-content hr {
+  border: none;
+  text-align: center;
+  margin: 1.5em 0;
+}
+
+.reader-content hr::after {
+  content: '* * *';
+  color: var(--reader-fg);
+  opacity: 0.5;
+}
+
+.reader-content > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
