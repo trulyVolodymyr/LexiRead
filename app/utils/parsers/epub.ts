@@ -39,6 +39,8 @@ export async function parseEpub(buffer: ArrayBuffer): Promise<ParsedBook> {
     }
   })
 
+  const tocLabels = await loadTocLabels(zip, opf, opfDir, manifest)
+
   const chapters: ParsedChapter[] = []
   const spineIds = Array.from(opf.querySelectorAll('spine > itemref'))
     .filter((ref) => ref.getAttribute('linear') !== 'no')
@@ -52,21 +54,95 @@ export async function parseEpub(buffer: ArrayBuffer): Promise<ParsedBook> {
     const file = zip.file(path)
     if (!file) continue
 
-    const doc = new DOMParser().parseFromString(await file.async('text'), 'text/html')
+    const doc = parseChapter(await file.async('text'))
     const body = doc.body
     if (!body) continue
 
     const blocks = extractBlocks(body)
     if (!blocks.length) continue
 
+    const tocTitle = tocLabels.get(path)
+    if (tocLabels.size && !tocTitle && chapters.length) {
+      // The book has a ToC but this spine file isn't in it — it's the
+      // continuation of a chapter split across files, not a new chapter.
+      chapters[chapters.length - 1]!.blocks.push(...blocks)
+      continue
+    }
+
     const heading = body.querySelector('h1, h2, h3')?.textContent?.trim()
-    chapters.push({ title: heading || doc.title?.trim() || null, blocks })
+    chapters.push({ title: tocTitle || heading || doc.title?.trim() || null, blocks })
   }
 
   if (!chapters.length) throw new ParseError('No readable text found in this EPUB.')
 
   const coverBlob = await extractCover(zip, opf, opfDir, manifest)
   return { title, author: author ?? null, language: normalizeLang(language), chapters, coverBlob }
+}
+
+/**
+ * Real chapter titles live in the navigation document — the EPUB 3 nav doc or
+ * the EPUB 2 NCX — not in the chapter markup. Returns spine-file path → label;
+ * the first label pointing into a file wins. Best-effort: any failure here
+ * just means we fall back to in-chapter headings.
+ */
+async function loadTocLabels(
+  zip: JSZip,
+  opf: Document,
+  opfDir: string,
+  manifest: Map<string, { href: string; mediaType: string; properties: string }>,
+): Promise<Map<string, string>> {
+  const labels = new Map<string, string>()
+
+  function dirOf(path: string): string {
+    return path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : ''
+  }
+
+  function add(docDir: string, href: string | null | undefined, label: string | null | undefined) {
+    const text = label?.replace(/\s+/g, ' ').trim()
+    if (!href || !text) return
+    const path = resolvePath(docDir, href.split('#')[0] ?? href)
+    if (!labels.has(path)) labels.set(path, text)
+  }
+
+  try {
+    // EPUB 3 nav document
+    const navItem = Array.from(manifest.values()).find((i) => i.properties.split(/\s+/).includes('nav'))
+    if (navItem) {
+      const navPath = resolvePath(opfDir, navItem.href)
+      const file = zip.file(navPath)
+      if (file) {
+        const doc = parseChapter(await file.async('text'))
+        const navs = Array.from(doc.querySelectorAll('nav'))
+        const toc = navs.find((n) => n.getAttribute('epub:type') === 'toc') ?? navs[0]
+        toc?.querySelectorAll('a[href]').forEach((a) => add(dirOf(navPath), a.getAttribute('href'), a.textContent))
+      }
+    }
+
+    // EPUB 2 NCX
+    if (!labels.size) {
+      const ncxId = opf.querySelector('spine')?.getAttribute('toc')
+      const ncxItem = (ncxId ? manifest.get(ncxId) : undefined)
+        ?? Array.from(manifest.values()).find((i) => i.mediaType === 'application/x-dtbncx+xml')
+      if (ncxItem) {
+        const ncxPath = resolvePath(opfDir, ncxItem.href)
+        const file = zip.file(ncxPath)
+        if (file) {
+          const ncx = parseXml(await file.async('text'))
+          ncx.querySelectorAll('navPoint').forEach((point) => {
+            add(
+              dirOf(ncxPath),
+              point.querySelector(':scope > content')?.getAttribute('src'),
+              point.querySelector(':scope > navLabel > text')?.textContent,
+            )
+          })
+        }
+      }
+    }
+  } catch {
+    // fall back to in-chapter headings
+  }
+
+  return labels
 }
 
 async function extractCover(
@@ -91,6 +167,18 @@ function readFile(zip: JSZip, path: string): Promise<string> {
   const file = zip.file(path)
   if (!file) throw new ParseError(`Invalid EPUB: missing ${path}`)
   return file.async('text')
+}
+
+/**
+ * Chapters are XHTML, so try XML parsing first: the lenient text/html parser
+ * mishandles constructs like a self-closed <title/> (RCDATA — it swallows the
+ * whole document into the title, leaving an empty body). Real-world EPUBs are
+ * often not well-formed XML though, so fall back to text/html on parse errors.
+ */
+function parseChapter(source: string): Document {
+  const doc = new DOMParser().parseFromString(source, 'application/xhtml+xml')
+  if (doc.body && !doc.querySelector('parsererror')) return doc
+  return new DOMParser().parseFromString(source, 'text/html')
 }
 
 function parseXml(xml: string): Document {

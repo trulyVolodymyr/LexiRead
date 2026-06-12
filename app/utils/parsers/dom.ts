@@ -63,6 +63,11 @@ export function extractBlocks(root: Element): ParsedBlock[] {
       } else if (tag === 'img' || tag === 'image' || tag === 'svg' || tag === 'figure' || tag === 'table') {
         // dropped in v1 — original file keeps them
         flushInline()
+      } else if (child.querySelector('p, h1, h2, h3, h4, h5, h6, div, blockquote, ul, ol')) {
+        // inline tag wrapping block content (e.g. <body><span><p>…) — recurse
+        // so the chapter keeps its paragraph structure
+        flushInline()
+        walk(child)
       } else {
         // unknown inline tag (a, i, span, …): keep its inner content inline
         pendingInline += child.outerHTML
